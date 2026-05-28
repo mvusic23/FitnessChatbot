@@ -91,6 +91,11 @@ def run() -> None:
             except Exception as exc:
                 console.print(f"[yellow]RAG retrieval failed: {exc}[/yellow]")
 
+        if rag_context:
+            console.print(
+                Panel(rag_context, title="[bold magenta]RAG Context[/bold magenta]", border_style="magenta")
+            )
+
         # RAG KORAK 7 - Augmented prompt:
         # build_messages ubacuje rag_context u system prompt, pa LLM dobiva i
         # korisnicko pitanje i relevantne dokumente iz knowledge basea.

@@ -86,30 +86,44 @@ class VectorStore:
             ],
         )
 
-    def query(self, embedding: list[float], k: int = 4) -> list[dict[str, Any]]:
+    def query(self, embedding: list[float], n: int = 4, candidate_multiplier: int = 3) -> list[dict[str, Any]]:
         if self.count == 0:
             return []
-        # RAG KORAK - Retrieval iz vektor baze:
-        # Ulaz je embedding korisnickog pitanja.
-        # ChromaDB ga usporeduje s embeddingom svakog dokument chunk-a koristeci
-        # cosine similarity i vraca k najblizih zapisa.
+        candidate_count = min(max(n * candidate_multiplier, n), self.count)
         result = self._collection.query(
             query_embeddings=[embedding],
-            n_results=min(k, self.count),
+            n_results=candidate_count,
             include=["documents", "metadatas", "distances"],
         )
         docs = (result.get("documents") or [[]])[0]
         metas = (result.get("metadatas") or [[]])[0]
+        distances = (result.get("distances") or [[]])[0]
         out: list[dict[str, Any]] = []
-        # RAG KORAK - Normalizacija rezultata:
-        # Iz ChromaDB odgovora uzimamo samo ono sto ostatku aplikacije treba:
-        # tekst chunka, naziv izvora i redni broj chunka.
-        for doc, meta in zip(docs, metas, strict=False):
+        for doc, meta, distance in zip(docs, metas, distances, strict=False):
+            score = 1.0 / (1.0 + float(distance))
             out.append(
                 {
                     "text": doc or "",
                     "source": (meta or {}).get("source", "unknown"),
                     "chunk_index": (meta or {}).get("chunk_index", 0),
+                    "distance": float(distance),
+                    "score": score,
                 }
             )
         return out
+
+    def get_by_source_and_index(self, source: str, chunk_index: int) -> dict[str, Any] | None:
+        """Dohvati chunk po izvoru i rednom broju."""
+        result = self._collection.get(
+            where={"$and": [{"source": source}, {"chunk_index": chunk_index}]},
+            include=["documents", "metadatas"],
+        )
+        docs = result.get("documents") or []
+        metas = result.get("metadatas") or []
+        if not docs:
+            return None
+        return {
+            "text": docs[0] or "",
+            "source": (metas[0] or {}).get("source", "unknown"),
+            "chunk_index": (metas[0] or {}).get("chunk_index", 0),
+        }

@@ -1,9 +1,9 @@
 """Retrieve relevant knowledge chunks for a user query.
 
 RAG retrieval:
-Ovaj modul odgovara demo funkciji dohvati(upit, top_n).
 Korisnicki upit se embeddira, usporedi s embeddingima u vektor bazi i pretvori
 u tekstualni kontekst koji ce se dodati LLM promptu.
+Koristi Top-N strategiju: rangira kandidat chunkove i uzima N najrelevantnijih.
 """
 
 from __future__ import annotations
@@ -15,21 +15,30 @@ from fitness_chatbot.rag.vector_store import VectorStore
 MAX_CONTEXT_CHARS = 6000
 
 
+def top_n_chunks(hits: list[dict], n: int) -> list[dict]:
+    """Return the N most relevant chunks by vector distance."""
+    ranked = sorted(
+        hits,
+        key=lambda hit: (
+            float(hit.get("distance", 1.0)),
+            str(hit.get("source", "")),
+            int(hit.get("chunk_index", 0)),
+        ),
+    )
+    return ranked[:n]
+
+
 def format_context(hits: list[dict]) -> str:
-    # RAG KORAK 4 - Formatiranje pronadenih dokumenata u kontekst:
-    # Vektor baza vraca strukturirane rezultate, a LLM treba obican tekst.
-    # Zato svaki pronadeni chunk pretvaramo u blok s oznakom izvora.
     if not hits:
         return ""
     parts: list[str] = []
     total = 0
     for hit in hits:
         source = hit.get("source", "unknown")
+        distance = hit.get("distance", None)
+        score = f" | relevance: {1 - distance:.2f}" if distance is not None else ""
         text = (hit.get("text") or "").strip()
-        block = f"[source: {source}]\n{text}"
-        # RAG zastita - ogranicenje velicine konteksta:
-        # Ne saljemo previse teksta u prompt jer model ima ogranicen context window
-        # i jer losiji/previse dug kontekst moze pogorsati odgovor.
+        block = f"\\[source: {source}{score}]\n{text}"
         if total + len(block) > MAX_CONTEXT_CHARS:
             break
         parts.append(block)
@@ -43,27 +52,14 @@ def retrieve_context(
     store: VectorStore,
     settings: Settings,
 ) -> str:
-    # RAG KORAK 1 - Provjera postoji li indeks:
-    # Ako vektor baza nema zapisa, preskacemo retrieval i chatbot radi kao obican LLM.
     if store.count == 0:
         return ""
 
-    # RAG KORAK 2 - Embedding korisnickog upita:
-    # Isto kao dokumente kod automatskog indexiranja, i pitanje pretvaramo u
-    # vektor brojeva.
-    # Tako pitanje i dokumente mozemo usporediti u istom embedding prostoru.
     embedding = client.embed(query)
-
-    # RAG KORAK 3 - Dohvat top-K najrelevantnijih chunkova:
-    # store.query radi semanticku pretragu i vraca chunkove najslicnije upitu.
-    hits = store.query(embedding, k=settings.rag_top_k)
-
-    # RAG KORAK 4 - Pretvaranje rezultata retrievala u tekst za prompt.
+    candidates = store.query(embedding, n=settings.rag_top_n)
+    hits = top_n_chunks(candidates, settings.rag_top_n)
     return format_context(hits)
 
 
 def rag_available(store: VectorStore) -> bool:
-    # RAG availability:
-    # RAG je uvijek ukljucen; retrieval moze vratiti kontekst samo ako postoji
-    # barem jedan indeksirani chunk u vektor bazi.
     return store.count > 0

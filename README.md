@@ -67,7 +67,6 @@ Example `.env` if you use `llama3` instead of `llama3.2`:
 OLLAMA_HOST=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3
 EMBED_MODEL=bge-m3
-RAG_TOP_K=4
 ```
 
 | Variable | Default | Description |
@@ -75,7 +74,6 @@ RAG_TOP_K=4
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama API URL |
 | `OLLAMA_MODEL` | `llama3.2` | Model used for chat |
 | `EMBED_MODEL` | `bge-m3` | Model used for document search (RAG) |
-| `RAG_TOP_K` | `4` | Number of document chunks per question |
 
 ### 5. Start the chatbot
 
