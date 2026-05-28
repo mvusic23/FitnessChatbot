@@ -8,6 +8,7 @@ dio i sprema rezultat u vektor bazu. To odgovara dijelu demo koda:
 
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -20,13 +21,14 @@ from fitness_chatbot.rag.vector_store import ChunkRecord, VectorStore
 
 CHUNK_SIZE = 1500
 CHUNK_OVERLAP = 200
-SUPPORTED_SUFFIXES = {".md", ".txt", ".pdf"}
+SUPPORTED_SUFFIXES = {".md", ".txt", ".pdf", ".csv"}
 BATCH_SIZE = 16
 
 
 def _read_file(path: Path) -> str:
     # RAG KORAK 1.1 - Ucitavanje dokumenta:
     # Ako je dokument PDF, izvlacimo tekst sa svake stranice.
+    # Ako je .csv, svaki red pretvaramo u tekstualni opis.
     # Ako je .md ili .txt, citamo ga kao obican UTF-8 tekst.
     if path.suffix.lower() == ".pdf":
         reader = PdfReader(str(path))
@@ -35,6 +37,15 @@ def _read_file(path: Path) -> str:
             text = page.extract_text()
             if text:
                 parts.append(text)
+        return "\n".join(parts)
+    if path.suffix.lower() == ".csv":
+        parts = []
+        with open(path, encoding="utf-8", errors="replace", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                line = ", ".join(f"{k}: {v}" for k, v in row.items() if v)
+                if line:
+                    parts.append(line)
         return "\n".join(parts)
     return path.read_text(encoding="utf-8", errors="replace")
 
