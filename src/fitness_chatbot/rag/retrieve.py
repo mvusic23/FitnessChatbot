@@ -49,7 +49,8 @@ def retrieve_context(
         return ""
 
     # RAG KORAK 2 - Embedding korisnickog upita:
-    # Isto kao dokumente kod /ingest, i pitanje pretvaramo u vektor brojeva.
+    # Isto kao dokumente kod automatskog indexiranja, i pitanje pretvaramo u
+    # vektor brojeva.
     # Tako pitanje i dokumente mozemo usporediti u istom embedding prostoru.
     embedding = client.embed(query)
 
@@ -61,8 +62,8 @@ def retrieve_context(
     return format_context(hits)
 
 
-def rag_available(store: VectorStore, settings: Settings) -> bool:
+def rag_available(store: VectorStore) -> bool:
     # RAG availability:
-    # RAG je aktivan samo ako je ukljucen konfiguracijom i ako postoji barem
-    # jedan indeksirani chunk u vektor bazi.
-    return settings.rag_enabled and store.count > 0
+    # RAG je uvijek ukljucen; retrieval moze vratiti kontekst samo ako postoji
+    # barem jedan indeksirani chunk u vektor bazi.
+    return store.count > 0

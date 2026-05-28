@@ -11,7 +11,7 @@ A terminal fitness coach powered by [Ollama](https://ollama.com). It runs fully 
 | [Ollama](https://ollama.com) | Must be installed and running |
 | Python **3.11+** | Check with `python3 --version` |
 | Chat model | e.g. `llama3.2`, `llama3`, `mistral` |
-| Embedding model | `bge-m3` (only if you use RAG) |
+| Embedding model | `bge-m3` for RAG document search |
 
 ---
 
@@ -67,9 +67,7 @@ Example `.env` if you use `llama3` instead of `llama3.2`:
 OLLAMA_HOST=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3
 EMBED_MODEL=bge-m3
-RAG_ENABLED=true
 RAG_TOP_K=4
-MAX_HISTORY_TURNS=20
 ```
 
 | Variable | Default | Description |
@@ -77,9 +75,7 @@ MAX_HISTORY_TURNS=20
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama API URL |
 | `OLLAMA_MODEL` | `llama3.2` | Model used for chat |
 | `EMBED_MODEL` | `bge-m3` | Model used for document search (RAG) |
-| `RAG_ENABLED` | `true` | Use knowledge base when indexed |
 | `RAG_TOP_K` | `4` | Number of document chunks per question |
-| `MAX_HISTORY_TURNS` | `20` | How many past turns to keep in memory |
 
 ### 5. Start the chatbot
 
@@ -113,7 +109,6 @@ You should see a welcome panel with the active model. If the model is missing, t
 |---------|----------------|
 | `/help` | Show available commands |
 | `/clear` | Clear conversation history (start fresh) |
-| `/ingest` | Rebuild the knowledge index from `data/knowledge/` |
 | `/quit` or `/exit` | Leave the chat |
 
 Press **Ctrl+C** during a reply to cancel that response (your last message is not kept in history).
@@ -129,14 +124,9 @@ Put files in `data/knowledge/`:
 - Supported: `.md`, `.txt`, `.pdf`
 - A sample file is included: `data/knowledge/gym_info.md`
 
-**Step 2 — Index them**
+**Step 2 — Start the chat**
 
-Inside the running chat:
-
-```
-/ingest
-```
-
+When the chat starts, it automatically reads `data/knowledge/`, creates embeddings, and refreshes the local vector index.
 Wait until you see a message like `Indexed N chunks from M file(s).`
 
 **Step 3 — Ask grounded questions**
@@ -147,7 +137,7 @@ Examples (if using the sample gym file):
 - *When is HIIT this week?*
 - *What is included in the Plus membership?*
 
-If no index exists yet, the bot still works as a general coach and reminds you to add files and run `/ingest`.
+If no index exists yet, the bot still works as a general coach and reminds you to add files to `data/knowledge/` and restart the chat.
 
 ### Typical first-time workflow
 
@@ -165,9 +155,6 @@ ollama pull bge-m3
 
 # Start chat
 fitness-chat
-
-# Inside the app
-/ingest
 What time is yoga on Tuesday?
 /clear
 /quit
@@ -181,7 +168,7 @@ What time is yoga on Tuesday?
 FitnessChatbot/
 ├── src/fitness_chatbot/     # Application code
 ├── data/knowledge/          # Documents for RAG (you add files here)
-├── chroma_db/               # Vector database (created after /ingest)
+├── chroma_db/               # Vector database (created automatically at startup)
 ├── .env                     # Your local config (not committed)
 ├── .env.example             # Template for .env
 └── pyproject.toml           # Dependencies and fitness-chat entry point
@@ -195,8 +182,8 @@ FitnessChatbot/
 |---------|------------|
 | `Cannot reach Ollama` | Start Ollama; check `OLLAMA_HOST` in `.env` |
 | `Model '…' not found` | Run `ollama pull <model>` or set `OLLAMA_MODEL` to a model from `ollama list` |
-| RAG not used | Run `/ingest` after adding files to `data/knowledge/` |
-| `/ingest` fails on embeddings | Run `ollama pull bge-m3` |
+| RAG not used | Add files to `data/knowledge/` and restart `fitness-chat` |
+| Automatic indexing fails on embeddings | Run `ollama pull bge-m3` |
 | `fitness-chat: command not found` | Activate `.venv` and run `pip install -e .` again |
 
 ---

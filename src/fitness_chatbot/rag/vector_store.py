@@ -60,8 +60,9 @@ class VectorStore:
 
     def reset(self) -> None:
         # RAG KORAK - Ponovno indexiranje:
-        # Brisemo staru kolekciju prije /ingest kako rezultat pretrage ne bi
-        # sadrzavao chunkove iz dokumenata koji vise ne postoje ili su promijenjeni.
+        # Brisemo staru kolekciju prije novog automatskog indexiranja kako
+        # rezultat pretrage ne bi sadrzavao chunkove iz dokumenata koji vise ne
+        # postoje ili su promijenjeni.
         self._client.delete_collection(self._collection_name)
         self._collection = self._client.get_or_create_collection(
             name=self._collection_name,

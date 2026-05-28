@@ -94,8 +94,8 @@ def ingest_knowledge_base(
         return 0
 
     # RAG KORAK 2 - Priprema vektor baze:
-    # Svaki /ingest ponovno gradi indeks od nule, tako da baza tocno odgovara
-    # trenutnom sadrzaju direktorija data/knowledge/.
+    # Svako automatsko indexiranje ponovno gradi indeks od nule, tako da baza
+    # tocno odgovara trenutnom sadrzaju direktorija data/knowledge/.
     store.reset()
     all_records: list[tuple[str, str, int, str]] = []
 

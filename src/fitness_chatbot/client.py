@@ -81,8 +81,9 @@ class OllamaClient:
         if not texts:
             return []
         # RAG KORAK - Batch embedding dokumenata:
-        # Koristi se kod /ingest. Umjesto da svaki chunk saljemo Ollami posebno,
-        # saljemo listu tekstova i dobijemo listu embedding vektora istim redom.
+        # Koristi se kod automatskog indexiranja knowledge basea. Umjesto da
+        # svaki chunk saljemo Ollami posebno, saljemo listu tekstova i dobijemo
+        # listu embedding vektora istim redom.
         response = self._client.embed(
             model=self.settings.embed_model,
             input=texts,

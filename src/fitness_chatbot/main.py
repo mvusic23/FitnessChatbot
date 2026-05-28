@@ -9,7 +9,6 @@ from rich.panel import Panel
 
 from fitness_chatbot.client import OllamaClient
 from fitness_chatbot.config import get_settings
-from fitness_chatbot.conversation import Conversation
 from fitness_chatbot.prompt import build_messages
 from fitness_chatbot.rag.ingest import ingest_knowledge_base
 from fitness_chatbot.rag.retrieve import rag_available, retrieve_context
@@ -19,7 +18,6 @@ HELP_TEXT = """
 [bold]Commands[/bold]
   /help    Show this help
   /clear   Clear conversation history
-  /ingest  Rebuild knowledge index from data/knowledge/
   /quit    Exit (also /exit)
 """
 
@@ -33,17 +31,25 @@ def run() -> None:
     # Vektor baza se otvara pri startu aplikacije. Koristi settings.embed_model
     # kako bi indeks bio vezan uz aktivni embedding model, npr. bge-m3.
     store = VectorStore(settings.chroma_dir, settings.embed_model)
-    conversation = Conversation(max_turns=settings.max_history_turns)
+    history: list[dict[str, str]] = []
 
     ok, err = client.check_connection()
     if not ok:
         console.print(f"[red]{err}[/red]")
         sys.exit(1)
 
-    rag_on = rag_available(store, settings)
+    # RAG KORAK 1-5 - Automatsko indexiranje pri startu:
+    # Aplikacija uvijek cita dokumente iz data/knowledge/, radi embeddinge i
+    # osvjezava vektor bazu prije prvog korisnickog pitanja.
+    ingest_knowledge_base(settings, client, store, console)
+
+    rag_on = rag_available(store)
     rag_hint = ""
-    if settings.rag_enabled and not rag_on:
-        rag_hint = "\n[dim]RAG: no index yet — add files to data/knowledge/ and run /ingest[/dim]"
+    if not rag_on:
+        rag_hint = (
+            "\n[dim]RAG: no index yet - add files to data/knowledge/ "
+            "and restart the chat[/dim]"
+        )
 
     console.print(
         Panel(
@@ -71,19 +77,12 @@ def run() -> None:
             console.print(HELP_TEXT)
             continue
         if lower == "/clear":
-            conversation.clear()
+            history.clear()
             console.print("[dim]Conversation cleared.[/dim]")
-            continue
-        if lower == "/ingest":
-            # RAG KORAK 1-5 - Indexiranje na zahtjev:
-            # Korisnik naredbom /ingest kaze aplikaciji da procita dokumente iz
-            # data/knowledge/, napravi embeddinge i spremi ih u vektor bazu.
-            ingest_knowledge_base(settings, client, store, console)
-            rag_on = rag_available(store, settings)
             continue
 
         rag_context: str | None = None
-        if rag_available(store, settings):
+        if rag_available(store):
             try:
                 # RAG KORAK 6 - Retrieval za konkretno pitanje:
                 # Prije slanja pitanja LLM-u trazimo najrelevantnije chunkove iz
@@ -96,12 +95,12 @@ def run() -> None:
         # build_messages ubacuje rag_context u system prompt, pa LLM dobiva i
         # korisnicko pitanje i relevantne dokumente iz knowledge basea.
         messages = build_messages(
-            conversation.history,
+            history,
             user_input,
             rag_context=rag_context,
         )
 
-        conversation.add_user(user_input)
+        history.append({"role": "user", "content": user_input})
         full_reply: list[str] = []
 
         console.print("[bold green]Coach:[/bold green] ", end="")
@@ -114,17 +113,19 @@ def run() -> None:
                 full_reply.append(chunk)
         except KeyboardInterrupt:
             console.print("\n[dim](reply cancelled)[/dim]")
-            conversation.pop_last_user()
+            if history and history[-1]["role"] == "user":
+                history.pop()
             continue
         except Exception as exc:
             console.print(f"\n[red]Error: {exc}[/red]")
-            conversation.pop_last_user()
+            if history and history[-1]["role"] == "user":
+                history.pop()
             continue
 
         console.print()
         assistant_text = "".join(full_reply)
         if assistant_text:
-            conversation.add_assistant(assistant_text)
+            history.append({"role": "assistant", "content": assistant_text})
 
 
 if __name__ == "__main__":
