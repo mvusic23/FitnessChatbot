@@ -36,8 +36,15 @@ def build_messages(
     """Build the full message list for Ollama (system + history + new user turn)."""
     system_content = FITNESS_SYSTEM_PROMPT
     if rag_context and rag_context.strip():
+        # RAG KORAK 5 - Augmentation:
+        # Retrieval je vec pronasao relevantne chunkove.
+        # Ovdje ih ubacujemo u system prompt kao <context> blok, tako da LLM
+        # odgovara na korisnicko pitanje uz dodatno znanje iz knowledge basea.
         system_content += "\n\n" + RAG_CONTEXT_TEMPLATE.format(rag_context=rag_context.strip())
 
+    # RAG KORAK 6 - Slanje LLM-u:
+    # Konacna lista poruka sadrzi system prompt, povijest razgovora i novi upit.
+    # Ako postoji rag_context, model ga vidi prije korisnickog pitanja.
     messages: list[dict[str, str]] = [{"role": "system", "content": system_content}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_input})

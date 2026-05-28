@@ -39,7 +39,7 @@ def get_settings() -> Settings:
     return Settings(
         ollama_host=os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434"),
         ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2"),
-        embed_model=os.getenv("EMBED_MODEL", "nomic-embed-text"),
+        embed_model=os.getenv("EMBED_MODEL", "bge-m3"),
         rag_enabled=_env_bool("RAG_ENABLED", True),
         rag_top_k=int(os.getenv("RAG_TOP_K", "4")),
         max_history_turns=int(os.getenv("MAX_HISTORY_TURNS", "20")),

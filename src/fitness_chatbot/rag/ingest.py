@@ -1,4 +1,10 @@
-"""Ingest documents from data/knowledge into the vector store."""
+"""Ingest documents from data/knowledge into the vector store.
+
+RAG KORAK 1 - Indexiranje dokumenata:
+Ovaj modul cita lokalne dokumente, dijeli ih na manje dijelove, embeddira svaki
+dio i sprema rezultat u vektor bazu. To odgovara dijelu demo koda:
+"dokumenti -> embeddinzi -> VECTOR_DB".
+"""
 
 from __future__ import annotations
 
@@ -19,6 +25,9 @@ BATCH_SIZE = 16
 
 
 def _read_file(path: Path) -> str:
+    # RAG KORAK 1.1 - Ucitavanje dokumenta:
+    # Ako je dokument PDF, izvlacimo tekst sa svake stranice.
+    # Ako je .md ili .txt, citamo ga kao obican UTF-8 tekst.
     if path.suffix.lower() == ".pdf":
         reader = PdfReader(str(path))
         parts = []
@@ -31,6 +40,11 @@ def _read_file(path: Path) -> str:
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    # RAG KORAK 1.2 - Dijeljenje teksta na chunkove:
+    # LLM i embedding modeli imaju ogranicen kontekst, pa veliki dokument ne
+    # spremamo kao jedan ogroman tekst. Dijelimo ga na manje dijelove.
+    # Overlap cuva dio prethodnog teksta kako se vazne recenice ne bi izgubile
+    # na granici izmedu dva chunka.
     text = text.strip()
     if not text:
         return []
@@ -49,6 +63,8 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
 
 
 def _discover_files(knowledge_dir: Path) -> list[Path]:
+    # RAG KORAK 1.0 - Pronalazak knowledge base dokumenata:
+    # Pretrazujemo data/knowledge/ i uzimamo samo formate koje znamo obraditi.
     if not knowledge_dir.is_dir():
         return []
     files: list[Path] = []
@@ -66,12 +82,20 @@ def ingest_knowledge_base(
 ) -> int:
     """Rebuild the index from knowledge_dir. Returns number of chunks indexed."""
     out = console or Console()
+
+    # RAG KORAK 1 - Ucitavanje knowledge basea:
+    # Pronalazimo sve dokumente koje korisnik zeli koristiti kao izvor znanja.
     files = _discover_files(settings.knowledge_dir)
     if not files:
         out.print("[yellow]No documents found in data/knowledge/ (.md, .txt, .pdf)[/yellow]")
+        # Ako nema dokumenata, brisemo stari indeks da chatbot ne koristi
+        # zastarjele informacije iz prethodnog indexiranja.
         store.reset()
         return 0
 
+    # RAG KORAK 2 - Priprema vektor baze:
+    # Svaki /ingest ponovno gradi indeks od nule, tako da baza tocno odgovara
+    # trenutnom sadrzaju direktorija data/knowledge/.
     store.reset()
     all_records: list[tuple[str, str, int, str]] = []
 
@@ -79,10 +103,13 @@ def ingest_knowledge_base(
         rel = path.relative_to(settings.knowledge_dir)
         source = str(rel)
         try:
+            # RAG KORAK 2.1 - Citanje izvornog teksta iz dokumenta.
             raw = _read_file(path)
         except Exception as exc:
             out.print(f"[red]Failed to read {source}: {exc}[/red]")
             continue
+        # RAG KORAK 2.2 - Svaki dokument pretvaramo u jedan ili vise chunkova.
+        # doc_id mora biti stabilan kako bi ChromaDB znala koji zapis azurira.
         for idx, chunk in enumerate(chunk_text(raw)):
             doc_id = f"{source}::{idx}"
             all_records.append((doc_id, chunk, idx, source))
@@ -102,7 +129,16 @@ def ingest_knowledge_base(
         for i in range(0, len(all_records), BATCH_SIZE):
             batch = all_records[i : i + BATCH_SIZE]
             texts = [b[1] for b in batch]
+
+            # RAG KORAK 3 - Embedding dokumenata:
+            # Svaki tekstualni chunk saljemo embedding modelu (npr. bge-m3).
+            # Model vraca vektor brojeva koji predstavlja znacenje teksta.
+            # To je ekvivalent demo funkciji dodaj_u_bazu(), samo batchirano.
             embeddings = client.embed_batch(texts)
+
+            # RAG KORAK 4 - Spajanje teksta, metapodataka i embeddinga:
+            # Za svaki chunk cuvamo originalni tekst, izvor, redni broj chunka
+            # i embedding vektor. To je zapis koji ide u vektor bazu.
             records = [
                 ChunkRecord(
                     id=doc_id,
@@ -113,6 +149,10 @@ def ingest_knowledge_base(
                 )
                 for (doc_id, text, idx, source), emb in zip(batch, embeddings, strict=True)
             ]
+
+            # RAG KORAK 5 - Spremanje u vektor bazu:
+            # ChromaDB sprema embeddinge i kasnije omogucuje pretragu po
+            # semantickoj slicnosti, slicno kao VECTOR_DB iz demo primjera.
             store.upsert(records)
             indexed += len(records)
             progress.advance(task, len(batch))

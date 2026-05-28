@@ -11,7 +11,7 @@ A terminal fitness coach powered by [Ollama](https://ollama.com). It runs fully 
 | [Ollama](https://ollama.com) | Must be installed and running |
 | Python **3.11+** | Check with `python3 --version` |
 | Chat model | e.g. `llama3.2`, `llama3`, `mistral` |
-| Embedding model | `nomic-embed-text` (only if you use RAG) |
+| Embedding model | `bge-m3` (only if you use RAG) |
 
 ---
 
@@ -26,7 +26,7 @@ Pull the models you plan to use:
 
 ```bash
 ollama pull llama3.2
-ollama pull nomic-embed-text
+ollama pull bge-m3
 ```
 
 If you already have other models (e.g. `llama3`), you can use those instead—set the name in `.env` (see step 4).
@@ -66,7 +66,7 @@ Example `.env` if you use `llama3` instead of `llama3.2`:
 ```env
 OLLAMA_HOST=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3
-EMBED_MODEL=nomic-embed-text
+EMBED_MODEL=bge-m3
 RAG_ENABLED=true
 RAG_TOP_K=4
 MAX_HISTORY_TURNS=20
@@ -76,7 +76,7 @@ MAX_HISTORY_TURNS=20
 |----------|---------|-------------|
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama API URL |
 | `OLLAMA_MODEL` | `llama3.2` | Model used for chat |
-| `EMBED_MODEL` | `nomic-embed-text` | Model used for document search (RAG) |
+| `EMBED_MODEL` | `bge-m3` | Model used for document search (RAG) |
 | `RAG_ENABLED` | `true` | Use knowledge base when indexed |
 | `RAG_TOP_K` | `4` | Number of document chunks per question |
 | `MAX_HISTORY_TURNS` | `20` | How many past turns to keep in memory |
@@ -161,7 +161,7 @@ pip install -e .
 
 # Terminal 2 — ensure models exist
 ollama pull llama3.2
-ollama pull nomic-embed-text
+ollama pull bge-m3
 
 # Start chat
 fitness-chat
@@ -196,7 +196,7 @@ FitnessChatbot/
 | `Cannot reach Ollama` | Start Ollama; check `OLLAMA_HOST` in `.env` |
 | `Model '…' not found` | Run `ollama pull <model>` or set `OLLAMA_MODEL` to a model from `ollama list` |
 | RAG not used | Run `/ingest` after adding files to `data/knowledge/` |
-| `/ingest` fails on embeddings | Run `ollama pull nomic-embed-text` |
+| `/ingest` fails on embeddings | Run `ollama pull bge-m3` |
 | `fitness-chat: command not found` | Activate `.venv` and run `pip install -e .` again |
 
 ---

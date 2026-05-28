@@ -28,7 +28,11 @@ def run() -> None:
     console = Console()
     settings = get_settings()
     client = OllamaClient(settings)
-    store = VectorStore(settings.chroma_dir)
+
+    # RAG KORAK - Inicijalizacija vektor baze:
+    # Vektor baza se otvara pri startu aplikacije. Koristi settings.embed_model
+    # kako bi indeks bio vezan uz aktivni embedding model, npr. bge-m3.
+    store = VectorStore(settings.chroma_dir, settings.embed_model)
     conversation = Conversation(max_turns=settings.max_history_turns)
 
     ok, err = client.check_connection()
@@ -71,6 +75,9 @@ def run() -> None:
             console.print("[dim]Conversation cleared.[/dim]")
             continue
         if lower == "/ingest":
+            # RAG KORAK 1-5 - Indexiranje na zahtjev:
+            # Korisnik naredbom /ingest kaze aplikaciji da procita dokumente iz
+            # data/knowledge/, napravi embeddinge i spremi ih u vektor bazu.
             ingest_knowledge_base(settings, client, store, console)
             rag_on = rag_available(store, settings)
             continue
@@ -78,10 +85,16 @@ def run() -> None:
         rag_context: str | None = None
         if rag_available(store, settings):
             try:
+                # RAG KORAK 6 - Retrieval za konkretno pitanje:
+                # Prije slanja pitanja LLM-u trazimo najrelevantnije chunkove iz
+                # vektor baze. Rezultat je tekstualni kontekst za prompt.
                 rag_context = retrieve_context(user_input, client, store, settings)
             except Exception as exc:
                 console.print(f"[yellow]RAG retrieval failed: {exc}[/yellow]")
 
+        # RAG KORAK 7 - Augmented prompt:
+        # build_messages ubacuje rag_context u system prompt, pa LLM dobiva i
+        # korisnicko pitanje i relevantne dokumente iz knowledge basea.
         messages = build_messages(
             conversation.history,
             user_input,
@@ -93,6 +106,9 @@ def run() -> None:
 
         console.print("[bold green]Coach:[/bold green] ", end="")
         try:
+            # RAG KORAK 8 - Generation:
+            # Chat model generira odgovor. Ako je rag_context pronaden, odgovor
+            # se moze temeljiti na dohacenim dokumentima umjesto samo na treningu modela.
             for chunk in client.chat_stream(messages):
                 console.print(chunk, end="")
                 full_reply.append(chunk)

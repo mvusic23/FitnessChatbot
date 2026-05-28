@@ -65,6 +65,9 @@ class OllamaClient:
                 yield content
 
     def embed(self, text: str) -> list[float]:
+        # RAG KORAK - Embedding jednog teksta:
+        # Koristi se kod retrievala, kada korisnicko pitanje treba pretvoriti
+        # u vektor kako bi se moglo usporediti s dokumentima u vektor bazi.
         response = self._client.embed(
             model=self.settings.embed_model,
             input=text,
@@ -77,6 +80,9 @@ class OllamaClient:
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
+        # RAG KORAK - Batch embedding dokumenata:
+        # Koristi se kod /ingest. Umjesto da svaki chunk saljemo Ollami posebno,
+        # saljemo listu tekstova i dobijemo listu embedding vektora istim redom.
         response = self._client.embed(
             model=self.settings.embed_model,
             input=texts,
