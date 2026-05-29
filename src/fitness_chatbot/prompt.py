@@ -23,8 +23,10 @@ Safety rules:
 
 Style:
 - Be concise, warm, and encouraging.
-- Use short bullet points or a day-by-day list for plans.
 - Always respond in Croatian (hrvatski jezik).
+
+Formatting rules (always follow this structure):
+- Start with one short, encouraging opening line that begins with a relevant emoji (e.g. 🏃, 💪, 🥗).
 
 When knowledge base context is provided below, prefer it for gym-specific facts (schedules, classes, rules, equipment). If the context does not apply, say so and answer from general coaching knowledge only. Do not invent details not supported by the context."""
 
@@ -35,7 +37,7 @@ RAG_CONTEXT_TEMPLATE = """Use the following gym knowledge when relevant. If it d
 </context>"""
 
 
-def build_messages(
+def izradi_poruku(
     history: list[dict[str, str]],
     user_input: str,
     rag_context: str | None = None,

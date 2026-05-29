@@ -2,78 +2,100 @@
 
 from __future__ import annotations
 
-import sys
-
 import pyfiglet
 from prompt_toolkit import prompt as pt_prompt
 from prompt_toolkit.formatted_text import HTML
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich import box
 
 from fitness_chatbot.client import OllamaClient
-from fitness_chatbot.config import get_settings
-from fitness_chatbot.prompt import build_messages
+from fitness_chatbot.prompt import izradi_poruku
 from fitness_chatbot.rag.ingest import ingest_knowledge_base
 from fitness_chatbot.rag.retrieve import rag_available, retrieve_context
 from fitness_chatbot.rag.vector_store import VectorStore
+from fitness_chatbot.config import Settings
 
-HELP_TEXT = """
-[bold]Commands[/bold]
-  /help    Show this help
-  /clear   Clear conversation history
-  /quit    Exit (also /exit)
-"""
+EXIT_COMMANDS = ("/quit", "/exit")
+BLOCK_CHARS = "█▀▄▌▐"
+BORDER_CHARS = "╔═╗║╚╝╠╣╬╦╩"
+
+
+def get_settings() -> Settings:
+    return Settings()
+
+
+def stvori_banner(raw: str) -> str:
+    parts = []
+    for ch in raw:
+        if ch in BLOCK_CHARS:
+            parts.append(f"[rgb(137,207,240)]{ch}[/rgb(137,207,240)]")
+        elif ch in BORDER_CHARS:
+            parts.append(f"[white]{ch}[/white]")
+        else:
+            parts.append(ch)
+    return "".join(parts)
+
+
+def pocetni_ekran(settings: Settings) -> Panel:
+    banner = stvori_banner(
+        pyfiglet.figlet_format("Fitness Coach", font="ansi_shadow")
+    )
+    body = (
+        "[bold bright_white]Dobrodošli u[/bold bright_white]\n\n" + banner
+        + f"\n▪ [bold]Fitness Coach[/bold] (Ollama: {settings.ollama_model})"
+        + "\n▪ /quit za izlaz iz Chatbot-a. Ctrl+C za otkazivanje odgovora."
+    )
+    return Panel(body, border_style="white", box=box.ROUNDED)
+
+
+def dohvati_context(question: str, client: OllamaClient, store: VectorStore, settings: Settings) -> str | None:
+    """Dohvati najrelevantnije chunkove iz vektor baze za zadano pitanje."""
+    if not rag_available(store):
+        return None
+    return retrieve_context(question, client, store, settings)
+
+
+def _stream_reply(
+    client: OllamaClient, messages: list[dict[str, str]], console: Console
+) -> str:
+    """Streamaj odgovor modela na konzolu i vrati cijeli tekst."""
+    console.print("[bold rgb(137,207,240)]Coach:[/bold rgb(137,207,240)] ", end="")
+    chunks: list[str] = []
+    for chunk in client.chat_stream(messages):
+        console.print(chunk, end="")
+        chunks.append(chunk)
+    console.print()
+    return "".join(chunks)
+
+
+def _answer(user_input: str, history: list[dict[str, str]], client: OllamaClient, store: VectorStore, settings: Settings, console: Console) -> None:
+    rag_context = dohvati_context(user_input, client, store, settings)
+    if rag_context:
+        console.print(
+            Panel(
+                rag_context,
+                title="[bold magenta]RAG Context[/bold magenta]",
+                border_style="magenta",
+            )
+        )
+
+    messages = izradi_poruku(history, user_input, rag_context=rag_context)
+    history.append({"role": "user", "content": user_input})
+    reply = _stream_reply(client, messages, console)
+    if reply:
+        history.append({"role": "assistant", "content": reply})
 
 
 def run() -> None:
     console = Console()
     settings = get_settings()
     client = OllamaClient(settings)
-
-    # RAG KORAK - Inicijalizacija vektor baze:
-    # Vektor baza se otvara pri startu aplikacije. Koristi settings.embed_model
-    # kako bi indeks bio vezan uz aktivni embedding model, npr. bge-m3.
     store = VectorStore(settings.chroma_dir, settings.embed_model)
     history: list[dict[str, str]] = []
 
-    ok, err = client.check_connection()
-    if not ok:
-        console.print(f"[red]{err}[/red]")
-        sys.exit(1)
-
-    # RAG KORAK 1-5 - Automatsko indexiranje pri startu:
-    # Aplikacija uvijek cita dokumente iz data/knowledge/, radi embeddinge i
-    # osvjezava vektor bazu prije prvog korisnickog pitanja.
     ingest_knowledge_base(settings, client, store, console)
-
-    rag_on = rag_available(store)
-    rag_hint = ""
-    if not rag_on:
-        rag_hint = (
-            "\n[dim]RAG: no index yet - add files to data/knowledge/ "
-            "and restart the chat[/dim]"
-        )
-
-    raw_banner = pyfiglet.figlet_format("Fitness Coach", font="ansi_shadow")
-    # Blokovi (█) u baby plavoj, shadow znakovi (╔═╗║╚╝) u bijeloj
-    colored_banner = ""
-    for ch in raw_banner:
-        if ch in "█▀▄▌▐":
-            colored_banner += f"[rgb(137,207,240)]{ch}[/rgb(137,207,240)]"
-        elif ch in "╔═╗║╚╝╠╣╬╦╩":
-            colored_banner += f"[white]{ch}[/white]"
-        else:
-            colored_banner += ch
-    console.print(
-    Panel(
-        "[bold bright_white]Dobrodošli u[/bold bright_white]\n\n" + colored_banner
-        + f"\n▪ [bold]Fitness Coach[/bold] (Ollama: {settings.ollama_model})"
-        + f"{rag_hint}\n▪ Type /help for commands. Ctrl+C to cancel a reply.",
-        border_style="white",
-        box=box.ROUNDED, 
-    )
-)
+    console.print(pocetni_ekran(settings))
 
     while True:
         try:
@@ -82,75 +104,14 @@ def run() -> None:
                 placeholder=HTML("<style color='gray'>pitaj me pitanje.. ↵</style>"),
             ).strip()
         except (EOFError, KeyboardInterrupt):
-            console.print("\n[dim]Goodbye![/dim]")
             break
 
         if not user_input:
             continue
-
-        lower = user_input.lower()
-        if lower in ("/quit", "/exit"):
-            console.print("[dim]Goodbye![/dim]")
+        if user_input.lower() in EXIT_COMMANDS:
             break
-        if lower == "/help":
-            console.print(HELP_TEXT)
-            continue
-        if lower == "/clear":
-            history.clear()
-            console.print("[dim]Conversation cleared.[/dim]")
-            continue
 
-        rag_context: str | None = None
-        if rag_available(store):
-            try:
-                # RAG KORAK 6 - Retrieval za konkretno pitanje:
-                # Prije slanja pitanja LLM-u trazimo najrelevantnije chunkove iz
-                # vektor baze. Rezultat je tekstualni kontekst za prompt.
-                rag_context = retrieve_context(user_input, client, store, settings)
-            except Exception as exc:
-                console.print(f"[yellow]RAG retrieval failed: {exc}[/yellow]")
-
-        if rag_context:
-            console.print(
-                Panel(rag_context, title="[bold magenta]RAG Context[/bold magenta]", border_style="magenta")
-            )
-
-        # RAG KORAK 7 - Augmented prompt:
-        # build_messages ubacuje rag_context u system prompt, pa LLM dobiva i
-        # korisnicko pitanje i relevantne dokumente iz knowledge basea.
-        messages = build_messages(
-            history,
-            user_input,
-            rag_context=rag_context,
-        )
-
-        history.append({"role": "user", "content": user_input})
-        full_reply: list[str] = []
-
-        console.print("[bold green]Coach:[/bold green] ", end="")
-        try:
-            # RAG KORAK 8 - Generation:
-            # Chat model generira odgovor. Ako je rag_context pronaden, odgovor
-            # se moze temeljiti na dohacenim dokumentima umjesto samo na treningu modela.
-            for chunk in client.chat_stream(messages):
-                console.print(chunk, end="")
-                full_reply.append(chunk)
-        except KeyboardInterrupt:
-            console.print("\n[dim](reply cancelled)[/dim]")
-            if history and history[-1]["role"] == "user":
-                history.pop()
-            continue
-        except Exception as exc:
-            console.print(f"\n[red]Error: {exc}[/red]")
-            if history and history[-1]["role"] == "user":
-                history.pop()
-            continue
-
-        console.print()
-        assistant_text = "".join(full_reply)
-        if assistant_text:
-            history.append({"role": "assistant", "content": assistant_text})
+        _answer(user_input, history, client, store, settings, console)
 
 
-if __name__ == "__main__":
-    run()
+def main():run()
