@@ -5,7 +5,6 @@ build-backend = "hatchling.build"
 [project]
 name = "fitness-chatbot"
 version = "0.1.0"
-description = "Terminal fitness coach powered by local Ollama with always-on RAG"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

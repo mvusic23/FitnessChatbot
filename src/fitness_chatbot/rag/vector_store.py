@@ -1,5 +1,3 @@
-"""ChromaDB vektor baza za RAG chunkove."""
-
 from __future__ import annotations
 
 import re

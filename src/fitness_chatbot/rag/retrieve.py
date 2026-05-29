@@ -1,5 +1,3 @@
-"""Dohvacanje relevantnih chunkova za korisnicko pitanje."""
-
 from __future__ import annotations
 
 from fitness_chatbot.client import OllamaClient
@@ -13,7 +11,6 @@ def dohvatikontekst(
     store: VectorStore,
     settings: Settings,
 ) -> list[dict]:
-    """Embeddira upit i vraca top-k najblizih chunkova."""
     if store.brojac == 0:
         return []
     embedding = client.embediraj(query)

@@ -1,5 +1,3 @@
-"""System prompt i sastavljanje poruka za Ollama chat."""
-
 from __future__ import annotations
 
 FITNESS_SYSTEM_PROMPT = """Ti si prijateljski fitness trener koji pomaže korisniku napraviti jednostavan i realan tjedni plan kretanja. NISI liječnik niti licencirani zdravstveni stručnjak.
@@ -39,7 +37,6 @@ RAG_CONTEXT_TEMPLATE = """Koristi sljedeće znanje iz baze kada je relevantno. A
 
 
 def izradiporuku(history: list[dict[str, str]], user_input: str, rag_context: str | None = None) -> list[dict[str, str]]:
-    """Sastavi listu poruka za Ollama (system + povijest + novi upit)."""
     system_content = FITNESS_SYSTEM_PROMPT
     if rag_context and rag_context.strip():
         system_content += "\n\n" + RAG_CONTEXT_TEMPLATE.format(rag_context=rag_context.strip())

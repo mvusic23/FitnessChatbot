@@ -52,7 +52,6 @@ def pocetniekran(settings: Settings) -> Panel:
 def streamajodgovor(
     client: OllamaClient, messages: list[dict[str, str]], console: Console
 ) -> str:
-    """Streamaj odgovor modela na konzolu i vrati cijeli tekst."""
     chunks: list[str] = []
     try:
         with Live(Spinner("dots", text="Generiram odgovor..."), console=console, transient=True):

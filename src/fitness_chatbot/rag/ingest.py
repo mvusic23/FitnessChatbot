@@ -1,5 +1,3 @@
-"""Indexiranje .txt dokumenata iz data/knowledge/ u vektor bazu."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,7 +19,6 @@ def pronadidatoteke(knowledge_dir: Path) -> list[Path]:
 
 
 def podijelijtekst(text: str) -> list[str]:
-    """Svaka neprazna linija je jedan chunk."""
     return [line.strip() for line in text.splitlines() if line.strip()]
 
 
@@ -31,7 +28,6 @@ def indeksiraj(
     store: VectorStore,
     console: Console | None = None,
 ) -> int:
-    """Ponovno indeksira knowledge base. Vraca broj indeksiranih chunkova."""
     out = console or Console()
     files = pronadidatoteke(settings.knowledge_dir)
 
