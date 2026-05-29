@@ -9,6 +9,9 @@ from rich import box
 from rich.console import Console
 from rich.panel import Panel
 
+from rich.live import Live
+from rich.spinner import Spinner
+
 from fitness_chatbot.client import OllamaClient
 from fitness_chatbot.prompt import izradi_poruku
 from fitness_chatbot.rag.ingest import ingest_knowledge_base
@@ -49,10 +52,10 @@ def pocetni_ekran(settings: Settings) -> Panel:
     return Panel(body, border_style="white", box=box.ROUNDED)
 
 
-def dohvati_context(question: str, client: OllamaClient, store: VectorStore, settings: Settings) -> str | None:
+def dohvati_context(question: str, client: OllamaClient, store: VectorStore, settings: Settings) -> list[dict]:
     """Dohvati najrelevantnije chunkove iz vektor baze za zadano pitanje."""
     if not rag_available(store):
-        return None
+        return []
     return retrieve_context(question, client, store, settings)
 
 
@@ -60,25 +63,41 @@ def _stream_reply(
     client: OllamaClient, messages: list[dict[str, str]], console: Console
 ) -> str:
     """Streamaj odgovor modela na konzolu i vrati cijeli tekst."""
-    console.print("[bold rgb(137,207,240)]Coach:[/bold rgb(137,207,240)] ", end="")
     chunks: list[str] = []
-    for chunk in client.chat_stream(messages):
-        console.print(chunk, end="")
-        chunks.append(chunk)
+    try:
+        with Live(Spinner("dots", text="Generiram odgovor..."), console=console, transient=True):
+            stream = client.chat_stream(messages)
+            first = next(stream, None)
+        if first is None:
+            return ""
+        console.print("[bold rgb(137,207,240)]Coach:[/bold rgb(137,207,240)] ", end="")
+        console.print(first, end="")
+        chunks.append(first)
+        for chunk in stream:
+            console.print(chunk, end="")
+            chunks.append(chunk)
+    except KeyboardInterrupt:
+        pass
     console.print()
     return "".join(chunks)
 
 
 def _answer(user_input: str, history: list[dict[str, str]], client: OllamaClient, store: VectorStore, settings: Settings, console: Console) -> None:
-    rag_context = dohvati_context(user_input, client, store, settings)
-    if rag_context:
+    hits = dohvati_context(user_input, client, store, settings)
+    rag_context: str | None = None
+    if hits:
+        panel_lines = []
+        for hit in hits:
+            score = 1 - hit["distance"]
+            panel_lines.append(f"[bold]{hit['source']}[/bold] (score: {score:.2f})\n  {hit['text']}")
         console.print(
             Panel(
-                rag_context,
+                "\n\n".join(panel_lines),
                 title="[bold magenta]RAG Context[/bold magenta]",
                 border_style="magenta",
             )
         )
+        rag_context = "\n\n".join(f"[source: {h['source']}]\n{h['text']}" for h in hits)
 
     messages = izradi_poruku(history, user_input, rag_context=rag_context)
     history.append({"role": "user", "content": user_input})
