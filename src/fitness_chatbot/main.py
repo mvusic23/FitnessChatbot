@@ -1,5 +1,3 @@
-"""CLI REPL for the fitness chatbot."""
-
 from __future__ import annotations
 
 import pyfiglet
@@ -8,14 +6,13 @@ from prompt_toolkit.formatted_text import HTML
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
-
 from rich.live import Live
 from rich.spinner import Spinner
 
 from fitness_chatbot.client import OllamaClient
-from fitness_chatbot.prompt import izradi_poruku
-from fitness_chatbot.rag.ingest import ingest_knowledge_base
-from fitness_chatbot.rag.retrieve import rag_available, retrieve_context
+from fitness_chatbot.prompt import izradiporuku
+from fitness_chatbot.rag.ingest import indeksiraj
+from fitness_chatbot.rag.retrieve import dohvatikontekst
 from fitness_chatbot.rag.vector_store import VectorStore
 from fitness_chatbot.config import Settings
 
@@ -24,11 +21,11 @@ BLOCK_CHARS = "█▀▄▌▐"
 BORDER_CHARS = "╔═╗║╚╝╠╣╬╦╩"
 
 
-def get_settings() -> Settings:
+def dohvatipostavke() -> Settings:
     return Settings()
 
 
-def stvori_banner(raw: str) -> str:
+def stvoribanner(raw: str) -> str:
     parts = []
     for ch in raw:
         if ch in BLOCK_CHARS:
@@ -40,8 +37,8 @@ def stvori_banner(raw: str) -> str:
     return "".join(parts)
 
 
-def pocetni_ekran(settings: Settings) -> Panel:
-    banner = stvori_banner(
+def pocetniekran(settings: Settings) -> Panel:
+    banner = stvoribanner(
         pyfiglet.figlet_format("Fitness Coach", font="ansi_shadow")
     )
     body = (
@@ -52,21 +49,14 @@ def pocetni_ekran(settings: Settings) -> Panel:
     return Panel(body, border_style="white", box=box.ROUNDED)
 
 
-def dohvati_context(question: str, client: OllamaClient, store: VectorStore, settings: Settings) -> list[dict]:
-    """Dohvati najrelevantnije chunkove iz vektor baze za zadano pitanje."""
-    if not rag_available(store):
-        return []
-    return retrieve_context(question, client, store, settings)
-
-
-def _stream_reply(
+def streamajodgovor(
     client: OllamaClient, messages: list[dict[str, str]], console: Console
 ) -> str:
     """Streamaj odgovor modela na konzolu i vrati cijeli tekst."""
     chunks: list[str] = []
     try:
         with Live(Spinner("dots", text="Generiram odgovor..."), console=console, transient=True):
-            stream = client.chat_stream(messages)
+            stream = client.streamajchat(messages)
             first = next(stream, None)
         if first is None:
             return ""
@@ -82,8 +72,8 @@ def _stream_reply(
     return "".join(chunks)
 
 
-def _answer(user_input: str, history: list[dict[str, str]], client: OllamaClient, store: VectorStore, settings: Settings, console: Console) -> None:
-    hits = dohvati_context(user_input, client, store, settings)
+def odgovori(user_input: str, history: list[dict[str, str]], client: OllamaClient, store: VectorStore, settings: Settings, console: Console) -> None:
+    hits = dohvatikontekst(user_input, client, store, settings)
     rag_context: str | None = None
     if hits:
         panel_lines = []
@@ -99,22 +89,22 @@ def _answer(user_input: str, history: list[dict[str, str]], client: OllamaClient
         )
         rag_context = "\n\n".join(f"[source: {h['source']}]\n{h['text']}" for h in hits)
 
-    messages = izradi_poruku(history, user_input, rag_context=rag_context)
+    messages = izradiporuku(history, user_input, rag_context=rag_context)
     history.append({"role": "user", "content": user_input})
-    reply = _stream_reply(client, messages, console)
+    reply = streamajodgovor(client, messages, console)
     if reply:
         history.append({"role": "assistant", "content": reply})
 
 
-def run() -> None:
+def pokreni() -> None:
     console = Console()
-    settings = get_settings()
+    settings = dohvatipostavke()
     client = OllamaClient(settings)
     store = VectorStore(settings.chroma_dir, settings.embed_model)
     history: list[dict[str, str]] = []
 
-    ingest_knowledge_base(settings, client, store, console)
-    console.print(pocetni_ekran(settings))
+    indeksiraj(settings, client, store, console)
+    console.print(pocetniekran(settings))
 
     while True:
         try:
@@ -130,7 +120,8 @@ def run() -> None:
         if user_input.lower() in EXIT_COMMANDS:
             break
 
-        _answer(user_input, history, client, store, settings, console)
+        odgovori(user_input, history, client, store, settings, console)
 
 
-def main():run()
+def main():
+    pokreni()

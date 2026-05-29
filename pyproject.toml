@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-fitness-chat = "fitness_chatbot.main:run"
+fitness-chat = "fitness_chatbot.main:pokreni"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fitness_chatbot"]

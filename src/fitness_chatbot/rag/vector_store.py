@@ -21,14 +21,14 @@ class ChunkRecord:
     embedding: list[float]
 
 
-def _collection_name(embed_model: str) -> str:
+def imekolekcije(embed_model: str) -> str:
     normalized = re.sub(r"[^a-zA-Z0-9_-]+", "_", embed_model).strip("_-") or "default"
     return f"{COLLECTION_PREFIX}_{normalized}"[:63]
 
 
 class VectorStore:
     def __init__(self, persist_dir: Path, embed_model: str) -> None:
-        self._name = _collection_name(embed_model)
+        self._name = imekolekcije(embed_model)
         persist_dir.mkdir(parents=True, exist_ok=True)
         self._client = chromadb.PersistentClient(path=str(persist_dir))
         self._collection = self._client.get_or_create_collection(
@@ -36,16 +36,16 @@ class VectorStore:
         )
 
     @property
-    def count(self) -> int:
+    def brojac(self) -> int:
         return self._collection.count()
 
-    def reset(self) -> None:
+    def resetiraj(self) -> None:
         self._client.delete_collection(self._name)
         self._collection = self._client.get_or_create_collection(
             name=self._name, metadata={"hnsw:space": "cosine"}
         )
 
-    def upsert(self, records: list[ChunkRecord]) -> None:
+    def umetni(self, records: list[ChunkRecord]) -> None:
         if not records:
             return
         self._collection.upsert(
@@ -55,12 +55,12 @@ class VectorStore:
             metadatas=[{"source": r.source, "chunk_index": r.chunk_index} for r in records],
         )
 
-    def query(self, embedding: list[float], n: int = 4) -> list[dict[str, Any]]:
-        if self.count == 0:
+    def pretrazi(self, embedding: list[float], n: int = 4) -> list[dict[str, Any]]:
+        if self.brojac == 0:
             return []
         result = self._collection.query(
             query_embeddings=[embedding],
-            n_results=min(n, self.count),
+            n_results=min(n, self.brojac),
             include=["documents", "metadatas", "distances"],
         )
         docs = (result.get("documents") or [[]])[0]

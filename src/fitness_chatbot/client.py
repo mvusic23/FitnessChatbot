@@ -14,7 +14,7 @@ class OllamaClient:
         self.settings = settings
         self._client = Client(host=settings.ollama_host)
 
-    def chat_stream(self, messages: list[dict[str, str]]) -> Iterator[str]:
+    def streamajchat(self, messages: list[dict[str, str]]) -> Iterator[str]:
         """Streamaj odgovor modela chunk po chunk."""
         stream = self._client.chat(
             model=self.settings.ollama_model,
@@ -26,12 +26,12 @@ class OllamaClient:
             if content:
                 yield content
 
-    def embed(self, text: str) -> list[float]:
+    def embediraj(self, text: str) -> list[float]:
         """Generiraj embedding vektor za jedan tekst."""
         response = self._client.embed(model=self.settings.embed_model, input=text)
         return response.embeddings[0]
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    def embedirajbatch(self, texts: list[str]) -> list[list[float]]:
         """Generiraj embedding vektore za listu tekstova."""
         if not texts:
             return []

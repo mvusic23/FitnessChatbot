@@ -14,18 +14,18 @@ from fitness_chatbot.rag.vector_store import ChunkRecord, VectorStore
 BATCH_SIZE = 16
 
 
-def _discover_files(knowledge_dir: Path) -> list[Path]:
+def pronadidatoteke(knowledge_dir: Path) -> list[Path]:
     if not knowledge_dir.is_dir():
         return []
     return sorted(p for p in knowledge_dir.rglob("*.txt") if p.is_file())
 
 
-def _chunk_text(text: str) -> list[str]:
+def podijelijtekst(text: str) -> list[str]:
     """Svaka neprazna linija je jedan chunk."""
     return [line.strip() for line in text.splitlines() if line.strip()]
 
 
-def ingest_knowledge_base(
+def indeksiraj(
     settings: Settings,
     client: OllamaClient,
     store: VectorStore,
@@ -33,9 +33,9 @@ def ingest_knowledge_base(
 ) -> int:
     """Ponovno indeksira knowledge base. Vraca broj indeksiranih chunkova."""
     out = console or Console()
-    files = _discover_files(settings.knowledge_dir)
+    files = pronadidatoteke(settings.knowledge_dir)
 
-    store.reset()
+    store.resetiraj()
 
     if not files:
         return 0
@@ -43,7 +43,7 @@ def ingest_knowledge_base(
     all_records: list[tuple[str, str, int, str]] = []
     for path in files:
         source = str(path.relative_to(settings.knowledge_dir))
-        chunks = _chunk_text(path.read_text(encoding="utf-8"))
+        chunks = podijelijtekst(path.read_text(encoding="utf-8"))
         for idx, chunk in enumerate(chunks):
             all_records.append((f"{source}::{idx}", chunk, idx, source))
 
@@ -52,17 +52,17 @@ def ingest_knowledge_base(
 
     indexed = 0
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=out) as progress:
-        task = progress.add_task("Embedding chunks...", total=len(all_records))
+        task = progress.add_task("Embeddiranje chunkova...", total=len(all_records))
         for i in range(0, len(all_records), BATCH_SIZE):
             batch = all_records[i : i + BATCH_SIZE]
-            embeddings = client.embed_batch([b[1] for b in batch])
+            embeddings = client.embedirajbatch([b[1] for b in batch])
             records = [
                 ChunkRecord(id=doc_id, text=text, source=source, chunk_index=idx, embedding=emb)
                 for (doc_id, text, idx, source), emb in zip(batch, embeddings, strict=True)
             ]
-            store.upsert(records)
+            store.umetni(records)
             indexed += len(records)
             progress.advance(task, len(batch))
 
-    out.print(f"[green]Indexed {indexed} chunks from {len(files)} file(s).[/green]")
+    out.print(f"[green]Indeksirano {indexed} chunkova iz {len(files)} datoteke.[/green]")
     return indexed
