@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import sys
 
+import pyfiglet
+from prompt_toolkit import prompt as pt_prompt
+from prompt_toolkit.formatted_text import HTML
 from rich.console import Console
 from rich.panel import Panel
+from rich import box
 
 from fitness_chatbot.client import OllamaClient
 from fitness_chatbot.config import get_settings
@@ -51,17 +55,32 @@ def run() -> None:
             "and restart the chat[/dim]"
         )
 
+    raw_banner = pyfiglet.figlet_format("Fitness Coach", font="ansi_shadow")
+    # Blokovi (█) u baby plavoj, shadow znakovi (╔═╗║╚╝) u bijeloj
+    colored_banner = ""
+    for ch in raw_banner:
+        if ch in "█▀▄▌▐":
+            colored_banner += f"[rgb(137,207,240)]{ch}[/rgb(137,207,240)]"
+        elif ch in "╔═╗║╚╝╠╣╬╦╩":
+            colored_banner += f"[white]{ch}[/white]"
+        else:
+            colored_banner += ch
     console.print(
-        Panel(
-            f"[bold]Fitness Coach[/bold] (Ollama: {settings.ollama_model})"
-            f"{rag_hint}\nType /help for commands. Ctrl+C to cancel a reply.",
-            border_style="green",
-        )
+    Panel(
+        "[bold bright_white]Dobrodošli u[/bold bright_white]\n\n" + colored_banner
+        + f"\n▪ [bold]Fitness Coach[/bold] (Ollama: {settings.ollama_model})"
+        + f"{rag_hint}\n▪ Type /help for commands. Ctrl+C to cancel a reply.",
+        border_style="white",
+        box=box.ROUNDED, 
     )
+)
 
     while True:
         try:
-            user_input = console.input("[bold cyan]You:[/bold cyan] ").strip()
+            user_input = pt_prompt(
+                HTML("<b>&gt;</b> "),
+                placeholder=HTML("<style color='gray'>pitaj me pitanje.. ↵</style>"),
+            ).strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Goodbye![/dim]")
             break
