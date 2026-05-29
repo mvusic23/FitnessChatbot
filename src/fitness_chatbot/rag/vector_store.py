@@ -1,20 +1,13 @@
-"""ChromaDB vector store for fitness knowledge chunks.
-
-RAG vektor baza:
-U demo primjeru VECTOR_DB je obicna Python lista parova (tekst, embedding).
-Ovdje istu ulogu ima ChromaDB: trajno sprema tekstove, embeddinge i metapodatke
-te zna brzo vratiti najrelevantnije zapise za embedding korisnickog upita.
-"""
+"""ChromaDB vektor baza za RAG chunkove."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-import re
 from typing import Any
 
 import chromadb
-from chromadb.api.models.Collection import Collection
 
 COLLECTION_PREFIX = "fitness_knowledge"
 
@@ -28,102 +21,52 @@ class ChunkRecord:
     embedding: list[float]
 
 
-def collection_name_for_model(embed_model: str) -> str:
-    """Build a stable Chroma collection name for the active embedding model."""
-    # RAG tehnicki detalj - razdvajanje indeksa po embedding modelu:
-    # Razliciti embedding modeli mogu vracati vektore razlicite dimenzije.
-    # Zato za bge-m3 koristimo zasebnu Chroma kolekciju od npr. nomic-embed-text.
-    normalized = re.sub(r"[^a-zA-Z0-9_-]+", "_", embed_model).strip("_-")
-    if not normalized:
-        normalized = "default"
+def _collection_name(embed_model: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9_-]+", "_", embed_model).strip("_-") or "default"
     return f"{COLLECTION_PREFIX}_{normalized}"[:63]
 
 
 class VectorStore:
     def __init__(self, persist_dir: Path, embed_model: str) -> None:
-        # RAG KORAK - Otvaranje vektor baze:
-        # persist_dir je direktorij na disku u kojem ChromaDB cuva indeks.
-        # Collection je "tablica" dokumenata za aktivni embedding model.
-        self._collection_name = collection_name_for_model(embed_model)
+        self._name = _collection_name(embed_model)
         persist_dir.mkdir(parents=True, exist_ok=True)
         self._client = chromadb.PersistentClient(path=str(persist_dir))
-        self._collection: Collection = self._client.get_or_create_collection(
-            name=self._collection_name,
-            metadata={"hnsw:space": "cosine"},
+        self._collection = self._client.get_or_create_collection(
+            name=self._name, metadata={"hnsw:space": "cosine"}
         )
 
     @property
     def count(self) -> int:
-        # RAG provjera dostupnosti:
-        # Ako je count 0, nema indeksiranih chunkova i retrieval nema sto vratiti.
         return self._collection.count()
 
     def reset(self) -> None:
-        # RAG KORAK - Ponovno indexiranje:
-        # Brisemo staru kolekciju prije novog automatskog indexiranja kako
-        # rezultat pretrage ne bi sadrzavao chunkove iz dokumenata koji vise ne
-        # postoje ili su promijenjeni.
-        self._client.delete_collection(self._collection_name)
+        self._client.delete_collection(self._name)
         self._collection = self._client.get_or_create_collection(
-            name=self._collection_name,
-            metadata={"hnsw:space": "cosine"},
+            name=self._name, metadata={"hnsw:space": "cosine"}
         )
 
     def upsert(self, records: list[ChunkRecord]) -> None:
         if not records:
             return
-        # RAG KORAK - Spremanje embeddinga:
-        # ids su stabilni identifikatori chunkova.
-        # documents su originalni tekstovi koji ce kasnije ici u prompt.
-        # embeddings su vektori po kojima se radi semanticka pretraga.
-        # metadatas cuvaju izvor i redni broj chunka radi objasnjenja/traceability.
         self._collection.upsert(
             ids=[r.id for r in records],
             documents=[r.text for r in records],
             embeddings=[r.embedding for r in records],
-            metadatas=[
-                {"source": r.source, "chunk_index": r.chunk_index} for r in records
-            ],
+            metadatas=[{"source": r.source, "chunk_index": r.chunk_index} for r in records],
         )
 
-    def query(self, embedding: list[float], n: int = 4, candidate_multiplier: int = 3) -> list[dict[str, Any]]:
+    def query(self, embedding: list[float], n: int = 4) -> list[dict[str, Any]]:
         if self.count == 0:
             return []
-        candidate_count = min(max(n * candidate_multiplier, n), self.count)
         result = self._collection.query(
             query_embeddings=[embedding],
-            n_results=candidate_count,
+            n_results=min(n, self.count),
             include=["documents", "metadatas", "distances"],
         )
         docs = (result.get("documents") or [[]])[0]
         metas = (result.get("metadatas") or [[]])[0]
         distances = (result.get("distances") or [[]])[0]
-        out: list[dict[str, Any]] = []
-        for doc, meta, distance in zip(docs, metas, distances, strict=False):
-            score = 1.0 / (1.0 + float(distance))
-            out.append(
-                {
-                    "text": doc or "",
-                    "source": (meta or {}).get("source", "unknown"),
-                    "chunk_index": (meta or {}).get("chunk_index", 0),
-                    "distance": float(distance),
-                    "score": score,
-                }
-            )
-        return out
-
-    def get_by_source_and_index(self, source: str, chunk_index: int) -> dict[str, Any] | None:
-        """Dohvati chunk po izvoru i rednom broju."""
-        result = self._collection.get(
-            where={"$and": [{"source": source}, {"chunk_index": chunk_index}]},
-            include=["documents", "metadatas"],
-        )
-        docs = result.get("documents") or []
-        metas = result.get("metadatas") or []
-        if not docs:
-            return None
-        return {
-            "text": docs[0] or "",
-            "source": (metas[0] or {}).get("source", "unknown"),
-            "chunk_index": (metas[0] or {}).get("chunk_index", 0),
-        }
+        return [
+            {"text": doc, "source": meta.get("source", ""), "chunk_index": meta.get("chunk_index", 0), "distance": dist}
+            for doc, meta, dist in zip(docs, metas, distances)
+        ]
