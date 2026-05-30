@@ -1,6 +1,10 @@
 # Fitness Chatbot
 
-A terminal fitness coach powered by [Ollama](https://ollama.com). It runs fully on your machine and can answer general coaching questions. With **RAG** (retrieval-augmented generation), it can also answer from your own gym documents in `data/knowledge/`.
+Chatbot pomaže korisniku složiti jednostavan, realan plan kretanja za tjedan. Korisnik unosi ciljeve
+(npr. više energije, mršavljenje, manje sjedenja), koliko vremena ima i koje aktivnosti voli ili ne voli.
+Chatbot predlaže kombinaciju šetnje, laganog trčanja, kućnih vježbi ili timskih sportova, uz kratka
+objašnjenja zašto je ta kombinacija dobra. Može nuditi alternativne opcije za dane kad korisnik
+"preskoči" trening.
 
 ---
 
@@ -8,7 +12,7 @@ A terminal fitness coach powered by [Ollama](https://ollama.com). It runs fully 
 
 | Requirement | Notes |
 |-------------|--------|
-| [Ollama](https://ollama.com) | Must be installed and running |
+| [Ollama](https://ollama.com) | Mora biti instalirana i pokrenuta |
 | Python **3.11+** | Check with `python3 --version` |
 | Chat model | e.g. `llama3.2`, `llama3`, `mistral` |
 | Embedding model | `bge-m3` for RAG document search |
@@ -22,28 +26,21 @@ A terminal fitness coach powered by [Ollama](https://ollama.com). It runs fully 
 1. Download Ollama from [ollama.com](https://ollama.com) and install it.
 2. Make sure the Ollama app is running (or start the daemon: `ollama serve`).
 
-Pull the models you plan to use:
+Modeli koji se koriste u projektu:
 
 ```bash
 ollama pull llama3.2
 ollama pull bge-m3
 ```
 
-If you already have other models (e.g. `llama3`), you can use those instead—set the name in `.env` (see step 4).
 
-Verify Ollama works:
-
-```bash
-ollama list
-```
-
-### 2. Clone or open the project
+### 2. Klonirajte ili otvorite projekt
 
 ```bash
 cd FitnessChatbot
 ```
 
-### 3. Create a virtual environment and install dependencies
+### 3. Kreirajte virtualno okruženje i instalirajte potrebne pakete.
 
 ```bash
 python3 -m venv .venv
@@ -53,29 +50,8 @@ source .venv/bin/activate          # macOS / Linux
 pip install -e .
 ```
 
-### 4. Configure environment variables
 
-Copy the example env file and edit it if needed:
-
-```bash
-cp .env.example .env
-```
-
-Example `.env` if you use `llama3` instead of `llama3.2`:
-
-```env
-OLLAMA_HOST=http://127.0.0.1:11434
-OLLAMA_MODEL=llama3
-EMBED_MODEL=bge-m3
-```
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama API URL |
-| `OLLAMA_MODEL` | `llama3.2` | Model used for chat |
-| `EMBED_MODEL` | `bge-m3` | Model used for document search (RAG) |
-
-### 5. Start the chatbot
+### 4. Počnite sa chatbotom
 
 With the virtual environment activated:
 

@@ -5,12 +5,7 @@ from fitness_chatbot.config import Settings
 from fitness_chatbot.rag.vector_store import VectorStore
 
 
-def dohvatikontekst(
-    query: str,
-    client: OllamaClient,
-    store: VectorStore,
-    settings: Settings,
-) -> list[dict]:
+def dohvatikontekst(query: str,client: OllamaClient,store: VectorStore,settings: Settings,) -> list[dict]:
     if store.brojac == 0:
         return []
     embedding = client.embediraj(query)

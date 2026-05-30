@@ -48,7 +48,7 @@ def indeksiraj(
 
     indexed = 0
     with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=out) as progress:
-        task = progress.add_task("Embeddiranje chunkova...", total=len(all_records))
+        task = progress.add_task("Embediranje chunkova...", total=len(all_records))
         for i in range(0, len(all_records), BATCH_SIZE):
             batch = all_records[i : i + BATCH_SIZE]
             embeddings = client.embedirajbatch([b[1] for b in batch])
@@ -59,6 +59,5 @@ def indeksiraj(
             store.umetni(records)
             indexed += len(records)
             progress.advance(task, len(batch))
-
     out.print(f"[green]Indeksirano {indexed} chunkova iz {len(files)} datoteke.[/green]")
     return indexed
